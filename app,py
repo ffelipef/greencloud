@@ -333,3 +333,17 @@ if st.session_state.dados_execucao is not None:
         })
         
     st.table(pd.DataFrame(lista_validada))
+
+    # Plotagem Gráfica das Funções de Pertinência de Saída Resultantes
+    st.markdown("**Visualização Física das Funções de Pertinência Otimizadas (Preço Dinâmico)**")
+    fig_memb, ax_memb = plt.subplots(figsize=(10, 2.5))
+    
+    # Gera o universo de preço para plotagem direta
+    u_preco = preco_ctrl.universe
+    ax_memb.plot(u_preco, preco_ctrl['baixo'].mf, 'b', linewidth=1.5, label='Baixo')
+    ax_memb.plot(u_preco, preco_ctrl['medio'].mf, 'g', linewidth=1.5, label='Médio')
+    ax_memb.plot(u_preco, preco_ctrl['alto'].mf, 'r', linewidth=1.5, label='Alto')
+    
+    ax_memb.set_title("Resultados de Espaçamento das Funções de Pertinência após Processamento")
+    ax_memb.legend()
+    st.pyplot(fig_memb)
