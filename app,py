@@ -183,3 +183,93 @@ def rodar_random_search(iteracoes, seed):
             melhor_fit = fit
             melhor_ind = ind
     return melhor_ind, melhor_fit
+
+# ==========================================
+# 6. INTERFACE GRÁFICA (STREAMLIT)
+# ==========================================
+st.title("⚡ GreenCloud — Sistema Evolutivo-Fuzzy")
+st.markdown("### Otimização Meta-Heurística de Precificação Dinâmica de Infraestrutura Cloud")
+st.write("Esta aplicação integra lógica fuzzy Mamdani com algoritmos genéticos baseados em strings reais para otimizar regras de faturamento sob cargas computacionais dinâmicas.")
+
+# Sidebar de Hiperparâmetros
+st.sidebar.header("🔧 Configurações Globais do AG")
+tam_pop = st.sidebar.slider("Tamanho da População", 10, 50, 20)
+geracoes = st.sidebar.slider("Número de Gerações", 5, 50, 15)
+
+# Instanciação dos Estados da Aplicação
+if "dados_execucao" not in st.session_state:
+    st.session_state.dados_execucao = None
+
+col1, col2, col3 = st.columns(3)
+
+# --- BOTÃO 1: HEURÍSTICA INICIAL ---
+if col1.button("▶️ Executar Heurística Inicial", use_container_width=True):
+    t_start = time.time()
+    fit_inicial = calcular_fitness(None)
+    t_end = time.time()
+    
+    st.session_state.dados_execucao = {
+        "tipo": "Inicial",
+        "melhor_fit": fit_inicial,
+        "tempo": t_end - t_start,
+        "cromossomo": [1.0, 1.0, 3.0, 3.0, 4.0, 5.0, 5.0],
+        "curva": [fit_inicial] * geracoes,
+        "std_fit": 0.0
+    }
+    st.success("Heurística Padrão Processada!")
+
+# --- BOTÃO 2: RANDOM SEARCH ---
+if col2.button("🎲 Executar Random Search", use_container_width=True):
+    t_start = time.time()
+    total_evals = tam_pop * geracoes
+    
+    # Roda 5 execuções independentes para coletar métricas de desvio padrão
+    fits_seeds = []
+    melhores_inds = []
+    for s in [42, 101, 777, 2026, 99]:
+        ind, fit = rodar_random_search(total_evals, seed=s)
+        fits_seeds.append(fit)
+        melhores_inds.append(ind)
+        
+    t_end = time.time()
+    idx_top = np.argmax(fits_seeds)
+    
+    st.session_state.dados_execucao = {
+        "tipo": "RandomSearch",
+        "melhor_fit": fits_seeds[idx_top],
+        "tempo": (t_end - t_start) / 5,
+        "cromossomo": melhores_inds[idx_top],
+        "curva": sorted(fits_seeds),
+        "std_fit": np.std(fits_seeds)
+    }
+    st.success("Busca Aleatória Finalizada!")
+
+# --- BOTÃO 3: ALGORITMO GENÉTICO ---
+if col3.button("🧬 Executar Otimização Genética", use_container_width=True):
+    t_start = time.time()
+    
+    # Executa 5 rodadas independentes mudando a semente (Exigência de Variabilidade)
+    resultados_ag = []
+    curvas_ag = []
+    
+    for s in [42, 101, 777, 2026, 99]:
+        ind, curva = rodar_algoritmo_genetico(geracoes, tam_pop, seed=s)
+        resultados_ag.append((ind, curva[-1]))
+        curvas_ag.append(curva)
+        
+    t_end = time.time()
+    
+    # Seleção do melhor resultado absoluto entre as sementes
+    melhores_fits = [r[1] for r in resultados_ag]
+    idx_best = np.argmax(melhores_fits)
+    melhor_cromossomo_ag = resultados_ag[idx_best][0]
+    
+    st.session_state.dados_execucao = {
+        "tipo": "AG",
+        "melhor_fit": melhores_fits[idx_best],
+        "tempo": (t_end - t_start) / 5,
+        "cromossomo": melhor_cromossomo_ag,
+        "curva": curvas_ag[idx_best],
+        "std_fit": np.std(melhores_fits)
+    }
+    st.success("Algoritmo Genético Otimizado com Sucesso!")
