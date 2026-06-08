@@ -273,3 +273,63 @@ if col3.button("🧬 Executar Otimização Genética", use_container_width=True)
         "std_fit": np.std(melhores_fits)
     }
     st.success("Algoritmo Genético Otimizado com Sucesso!")
+
+# ==========================================
+# 7. EXIBIÇÃO DE RESULTADOS & GRÁFICOS
+# ==========================================
+if st.session_state.dados_execucao is not None:
+    res = st.session_state.dados_execucao
+    
+    st.markdown("---")
+    st.subheader("📊 Painel Analítico de Desempenho")
+    
+    # Tabela estática de baseline para o cálculo de melhoria percentual
+    fit_base_inicial = calcular_fitness(None)
+    melhoria_perc = ((res["melhor_fit"] - fit_base_inicial) / fit_base_inicial) * 100
+    
+    # Grid de Indicadores Chave (KPIs)
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("Melhor Fitness Encontrado", f"{res['melhor_fit']:.2f} pts")
+    kpi2.metric("Tempo Médio de Execução", f"{res['tempo']:.4f} seg")
+    kpi3.metric("Melhoria vs Heurística", f"{melhoria_perc:+.2f}%")
+    kpi4.metric("Desvio Padrão (5-Seeds)", f"± {res['std_fit']:.3f}")
+
+    # Plotagem da Curva de Convergência do AG
+    col_graph, col_param = st.columns([2, 1])
+    
+    with col_graph:
+        st.markdown("**Evolução Temporal do Fitness Técnico**")
+        fig, ax = plt.subplots(figsize=(7, 3.2))
+        ax.plot(res["curva"], marker='o', color='#10b981', linewidth=2)
+        ax.set_title("Curva de Convergência / Aprendizado Real")
+        ax.set_xlabel("Mapeamento de Épocas / Gerações")
+        ax.set_ylabel("Score de Fitness (Lucratividade Líquida)")
+        ax.grid(True, linestyle='--', alpha=0.6)
+        st.pyplot(fig)
+        
+    with col_param:
+        st.markdown("**DNA do Cromossomo Otimizado**")
+        st.write("Distribuição ordenada dos pontos mapeados para as funções triangulares do Preço:")
+        df_genes = pd.DataFrame(res["cromossomo"], columns=["Vértice (Fator Multiplicador)"])
+        st.dataframe(df_genes, use_container_width=True)
+
+    # ==========================================
+    # 8. VALIDAÇÃO EM 6 CENÁRIOS FIXOS
+    # ==========================================
+    st.markdown("---")
+    st.subheader("🧪 Validação Cruzada: Matriz de Teste em Produção (6 Cenários)")
+    
+    # Reconstrói o simulador atual com o cromossomo em memória
+    simulador_val, preco_ctrl = construir_sistema_fuzzy(res["cromossomo"])
+    
+    lista_validada = []
+    for cen in CENARIOS_VALIDACAO:
+        preco_calculado = executar_fuzzy(simulador_val, cen["Carga"], cen["Demanda"])
+        lista_validada.append({
+            "Cenário Operacional": cen["Nome"],
+            "Carga Alocada (%)": f"{cen['Carga']:.1f}%",
+            "Taxa de Requisições": f"{cen['Demanda']:.0f} req/s",
+            "Multiplicador de Preço (Saída)": f"{preco_calculado:.2f}x"
+        })
+        
+    st.table(pd.DataFrame(lista_validada))
