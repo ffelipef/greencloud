@@ -57,3 +57,13 @@ A avaliação quantitativa simula o comportamento financeiro ao longo de 10 cen�
 Penalidade por Abuso de Mercado: Preços excessivos quando a procura/demanda está excessivamente baixa.
 Penalidade por Risco de Quebra de SLA: Sub-precificação em momentos de sobrecarga crítica de hardware.
 
+---
+## 🤖 Declaração do Uso de IA:
+FERRAMENTA | FINALIDADE | COMANDO/PROMPT RESUMIDO | REVISAO CRITICA DA EQUIPE
+\------------------------------------------------------------------------------
+CLAUDE/    | Estruturação| "Gere um app Streamlit |O código gerado inicialmente
+GEMINI     | de esqueleto| integrando scikit-fuzzy|possuía redundâncias nas regras.
+           | interface do| com AG..."             |Eu revisei a lógica de ordenação
+           | Streamlit.  |                        |do cromossomo (sorted) para 
+           |             |                        |evitar quebras nos triângulos
+           |             |                        |do scikit-fuzzy.
