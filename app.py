@@ -348,45 +348,45 @@ if st.session_state.dados_execucao is not None:
     ax_memb.legend()
     st.pyplot(fig_memb)
 
-#superficie de decisao 3d
-st.markdown("---")
-st.subheader("🌐 Superfície de Decisão 3D do Controlador")
-st.write("Mapeamento geométrico do comportamento do sistema em todo o universo de discurso.")
+    #superficie de decisao 3d
+    st.markdown("---")
+    st.subheader("🌐 Superfície de Decisão 3D do Controlador")
+    st.write("Mapeamento geométrico do comportamento do sistema em todo o universo de discurso.")
 
-with st.spinner("Gerando malha da superfície 3D..."):
-    x_carga = np.linspace(0, 100, 20)
-    y_demanda = np.linspace(0, 1000, 20)
-    X, Y = np.meshgrid(x_carga, y_demanda)
-    Z = np.zeros_like(X)
+    with st.spinner("Gerando malha da superfície 3D..."):
+        x_carga = np.linspace(0, 100, 20)
+        y_demanda = np.linspace(0, 1000, 20)
+        X, Y = np.meshgrid(x_carga, y_demanda)
+        Z = np.zeros_like(X)
 
 
-    for i in range(X.shape[0]):
-        for j in range(X.shape[1]):
-            Z[i, j] = executar_fuzzy(simulador_val, X[i, j], Y[i, j])
+        for i in range(X.shape[0]):
+            for j in range(X.shape[1]):
+                Z[i, j] = executar_fuzzy(simulador_val, X[i, j], Y[i, j])
 
-    fig_3d = plt.figure(figsize=(10, 5))
-    ax_3d = fig_3d.add_subplot(111, projection='3d')
-    surf = ax_3d.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', alpha=0.9)
-    
-    ax_3d.set_xlabel('Carga do Servidor (%)')
-    ax_3d.set_ylabel('Demanda (req/s)')
-    ax_3d.set_zlabel('Multiplicador de Preço')
-    ax_3d.set_title('Superfície de Controle Otimizada')
-    fig_3d.colorbar(surf, ax=ax_3d, shrink=0.5, aspect=5)
-    
-    st.pyplot(fig_3d)
+        fig_3d = plt.figure(figsize=(10, 5))
+        ax_3d = fig_3d.add_subplot(111, projection='3d')
+        surf = ax_3d.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', alpha=0.9)
+        
+        ax_3d.set_xlabel('Carga do Servidor (%)')
+        ax_3d.set_ylabel('Demanda (req/s)')
+        ax_3d.set_zlabel('Multiplicador de Preço')
+        ax_3d.set_title('Superfície de Controle Otimizada')
+        fig_3d.colorbar(surf, ax=ax_3d, shrink=0.5, aspect=5)
+        
+        st.pyplot(fig_3d)
 
-#teste manual
-st.markdown("---")
-st.subheader("🎮 Simulação Interativa (Suporte à Decisão)")
-st.write("Insira valores manualmente para testar a robustez do motor sintonizado.")
+    #teste manual
+    st.markdown("---")
+    st.subheader("🎮 Simulação Interativa (Suporte à Decisão)")
+    st.write("Insira valores manualmente para testar a robustez do motor sintonizado.")
 
-input_col1, input_col2 = st.columns(2)
-with input_col1:
-    u_carga = st.number_input("Digite a Carga Atual do Servidor (%)", min_value=0.0, max_value=100.0, value=50.0)
-with input_col2:
-    u_demanda = st.number_input("Digite a Demanda de Requisições (req/s)", min_value=0.0, max_value=1000.0, value=500.0)
-    
-if st.button("Calcular Preço em Tempo Real"):
-    preco_usuario = executar_fuzzy(simulador_val, u_carga, u_demanda)
-    st.metric(label="Preço Dinâmico Recomendado", value=f"{preco_usuario:.2f}x")
+    input_col1, input_col2 = st.columns(2)
+    with input_col1:
+        u_carga = st.number_input("Digite a Carga Atual do Servidor (%)", min_value=0.0, max_value=100.0, value=50.0)
+    with input_col2:
+        u_demanda = st.number_input("Digite a Demanda de Requisições (req/s)", min_value=0.0, max_value=1000.0, value=500.0)
+        
+    if st.button("Calcular Preço em Tempo Real"):
+        preco_usuario = executar_fuzzy(simulador_val, u_carga, u_demanda)
+        st.metric(label="Preço Dinâmico Recomendado", value=f"{preco_usuario:.2f}x")
