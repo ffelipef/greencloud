@@ -1,4 +1,4 @@
-#⚡ GreenCloud — Sistema Evolutivo-Fuzzy para Precificação Dinâmica de Servidores
+## ⚡ GreenCloud — Sistema Evolutivo-Fuzzy para Precificação Dinâmica de Servidores
 
 O **GreenCloud** é um protótipo funcional de Inteligência Computacional que une um **Motor de Inferência Fuzzy Mamdani** (para tomada de decisão e tarifação dinâmica) a um **Motor Evolutivo (Algoritmo Genético)** encarregado de sintonizar as funções de pertinência para maximizar a lucratividade sob restrições severas de infraestrutura.
 
