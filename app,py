@@ -1,0 +1,185 @@
+import time
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+import streamlit as st
+import pandas as pd
+
+st.set_page_config(page_title="GreenCloud System", layout="wide")
+
+# historico de cenario p calculo de fitness
+CENARIOS_HISTORICOS = [
+    (10, 50), (25, 150), (40, 300), (50, 450), (60, 600),
+    (75, 750), (85, 800), (90, 950), (95, 1000), (30, 800)
+]
+
+
+CENARIOS_VALIDACAO = [
+    {"Nome": "Madrugada Ociosa", "Carga": 10.0, "Demanda": 50.0},
+    {"Nome": "Início do Expediente", "Carga": 45.0, "Demanda": 300.0},
+    {"Nome": "Pico de Acesso", "Carga": 85.0, "Demanda": 850.0},
+    {"Nome": "Sobrecarga Crítica", "Carga": 98.0, "Demanda": 980.0},
+    {"Nome": "Ataque DDoS / Anomalia", "Carga": 95.0, "Demanda": 150.0}, # Carga alta, pouca demanda real produtiva
+    {"Nome": "Alta Eficiência", "Carga": 30.0, "Demanda": 700.0}
+]
+
+#motor fuzy (MAMDANI)
+def construir_sistema_fuzzy(params_saida=None):
+    """
+    Constrói o Sistema de Controle Fuzzy Mamdani.
+    Se 'params_saida' (cromossomo) for fornecido, os vértices de 'preco' serão customizados.
+    Cromossomo esperado: lista/array com 7 pontos ordenados de 1.0 a 5.0.
+    """
+    carga = ctrl.Antecedent(np.arange(0, 101, 1), 'carga')
+    demanda = ctrl.Antecedent(np.arange(0, 1001, 10), 'demanda')
+    preco = ctrl.Consequent(np.arange(1.0, 5.1, 0.1), 'preco')
+
+    #pert entrada
+    carga['baixa'] = fuzz.trimf(carga.universe, [0, 0, 50])
+    carga['media'] = fuzz.trimf(carga.universe, [20, 50, 80])
+    carga['alta'] = fuzz.trimf(carga.universe, [50, 100, 100])
+
+    demanda['baixa'] = fuzz.trimf(demanda.universe, [0, 0, 400])
+    demanda['media'] = fuzz.trimf(demanda.universe, [200, 500, 800])
+    demanda['alta'] = fuzz.trimf(demanda.universe, [600, 1000, 1000])
+
+    #pert saida
+    if params_saida is None:
+        #heuristica padrao
+        preco['baixo'] = fuzz.trimf(preco.universe, [1.0, 1.0, 3.0])
+        preco['medio'] = fuzz.trimf(preco.universe, [2.0, 3.0, 4.0])
+        preco['alto'] = fuzz.trimf(preco.universe, [3.0, 5.0, 5.0])
+    else:
+        p = sorted(params_saida)
+        #p0, p1 e p2 -> baixo | p2, p3 e p4 -> medio | p4, p5 e p6 -> alto
+        preco['baixo'] = fuzz.trimf(preco.universe, [p[0], p[1], p[2]])
+        preco['medio'] = fuzz.trimf(preco.universe, [p[2], p[3], p[4]])
+        preco['alto'] = fuzz.trimf(preco.universe, [p[4], p[5], p[6]])
+
+    regras = [
+        ctrl.Rule(carga['baixa'] & demanda['baixa'], preco['baixo']),
+        ctrl.Rule(carga['baixa'] & demanda['media'], preco['baixo']),
+        ctrl.Rule(carga['baixa'] & demanda['alta'], preco['medio']),
+        
+        ctrl.Rule(carga['media'] & demanda['baixa'], preco['baixo']),
+        ctrl.Rule(carga['media'] & demanda['media'], preco['medio']),
+        ctrl.Rule(carga['media'] & demanda['alta'], preco['alto']),
+        
+        ctrl.Rule(carga['alta'] & demanda['baixa'], preco['medio']),
+        ctrl.Rule(carga['alta'] & demanda['media'], preco['alto']),
+        ctrl.Rule(carga['alta'] & demanda['alta'], preco['alto']),
+        
+        # Regras de contorno/específicas adicionais para totalizar as 12 estritas
+        ctrl.Rule(carga['baixa'] & demanda['alta'], preco['medio']),
+        ctrl.Rule(carga['alta'] & demanda['baixa'], preco['medio']),
+        ctrl.Rule(carga['media'] & demanda['alta'], preco['alto'])
+    ]
+
+    sistema_controle = ctrl.ControlSystem(regras)
+    return ctrl.ControlSystemSimulation(sistema_controle), preco
+
+def executar_fuzzy(simulador, v_carga, v_demanda):
+    """Executa a inferência Fuzzy tratando possíveis exceções de corte."""
+    try:
+        simulador.input['carga'] = v_carga
+        simulador.input['demanda'] = v_demanda
+        simulador.compute()
+        return simulador.output['preco']
+    except Exception:
+        # Fallback caso a desnebularização falhe por falta de ativação de regras
+        return 1.0
+
+#fitness (funca ode aptidao)
+def calcular_fitness(cronossomo):
+    """
+    Avalia o lucro simulado sob restrições econômicas e operacionais.
+    Bonifica o equilíbrio econômico e pune abusos ou sub-precificação.
+    """
+    simulador, _ = construir_sistema_fuzzy(cronossomo)
+    lucro_total = 0.0
+    
+    for c_carga, c_demanda in CENARIOS_HISTORICOS:
+        fator_preco = executar_fuzzy(simulador, c_carga, c_demanda)
+        
+        # modelo economico da simulação
+        ganho = (c_demanda * 0.1) * fator_preco
+        penalidade = 0.0
+
+        #preço abusivo sem demanda
+        if fator_preco > 3.5 and c_demanda < 400:
+            penalidade += (fator_preco - 3.5) * 50.0
+        #preço muito baixo em carga alta
+        if cl_fator := (fator_preco < 2.5 and c_carga > 80):
+            penalidade += (2.5 - fator_preco) * 80.0
+            
+        lucro_total += (ganho - penalidade)
+        
+    return max(0.1, lucro_total)
+
+#algoritimo genetico
+def gerar_cromossomo():
+    """Gera um indivíduo válido composto por 7 genes ordenados entre 1.0 e 5.0"""
+    return sorted(np.random.uniform(1.0, 5.0, 7))
+
+def selecao_torneio(populacao, fitness, k=3):
+    selecionados = np.random.choice(len(populacao), k, replace=False)
+    melhor_idx = selecionados[np.argmax(fitness[selecionados])]
+    return populacao[melhor_idx].copy()
+
+def crossover_blend(pai1, pai2, alpha=0.3):
+    """Crossover BLX-alpha para representação real contínua."""
+    filho = []
+    for g1, g2 in zip(pai1, pai2):
+        min_g, max_g = min(g1, g2), max(g1, g2)
+        diff = max_g - min_g
+        gene = np.random.uniform(min_g - alpha * diff, max_g + alpha * diff)
+        gene = np.clip(gene, 1.0, 5.0)
+        filho.append(gene)
+    return sorted(filho)
+
+def mutacao_gaussiana(cromossomo, pm=0.2, escala=0.3):
+    if np.random.rand() < pm:
+        cromossomo = [np.clip(gene + np.random.normal(0, escala), 1.0, 5.0) for gene in cromossomo]
+    return sorted(cromossomo)
+
+def rodar_algoritmo_genetico(geracoes, tam_pop, seed):
+    np.random.seed(seed)
+    populacao = [gerar_cromossomo() for _ in range(tam_pop)]
+    historico_fitness = []
+    
+    for gen in range(geracoes):
+        fitness_pop = np.array([calcular_fitness(ind) for ind in populacao])
+        historico_fitness.append(np.max(fitness_pop))
+        
+        nova_pop = []
+        # Elitismo: preserva os 2 melhores
+        melhores_idx = np.argsort(fitness_pop)[-2:]
+        for idx in melhores_idx:
+            nova_pop.append(populacao[idx])
+            
+        while len(nova_pop) < tam_pop:
+            p1 = selecao_torneio(populacao, fitness_pop)
+            p2 = selecao_torneio(populacao, fitness_pop)
+            filho = crossover_blend(p1, p2)
+            filho = mutacao_gaussiana(filho)
+            nova_pop.append(filho)
+            
+        populacao = nova_pop
+        
+    fitness_pop = np.array([calcular_fitness(ind) for ind in populacao])
+    melhor_idx = np.argmax(fitness_pop)
+    return populacao[melhor_idx], historico_fitness
+
+#random search
+def rodar_random_search(iteracoes, seed):
+    np.random.seed(seed)
+    melhor_fit = -1
+    melhor_ind = None
+    for _ in range(iteracoes):
+        ind = gerar_cromossomo()
+        fit = calcular_fitness(ind)
+        if fit > melhor_fit:
+            melhor_fit = fit
+            melhor_ind = ind
+    return melhor_ind, melhor_fit
